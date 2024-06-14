@@ -2,63 +2,127 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 public class PlayerControl : MonoBehaviour
 {
-    public bool isGrounded = true;
-    public float speed = 20f;
-    public float horizontalSpeed = 5f;
+    public float speed = 10f;
+    public float laneWidth = 2f;
     public float jumpForce = 10f;
+    public float slideDuration = 0.5f;
+    public float jumpDuration = 0.5f; // Duration for the entire jump (up and down)
+    public float scoreMultiplier = 1f;
+    [SerializeField]private TMP_Text coinText;
+    [SerializeField]private TMP_Text scoreText;
+    private float score = 0f;
+    private int currentLane = 0;
+    private bool isJumping = false;
+    private bool isSliding = false;
+    public int coins = 0;
     private Rigidbody rb;
-    // Start is called before the first frame update
+    private CapsuleCollider playerCollider;
+    private Vector3 originalColliderSize;
+
     void Start()
     {
+        coinText.text = $"Coins: {coins}";
+        scoreText.text = "0";
         rb = GetComponent<Rigidbody>();
-        transform.position = new Vector3(0, 1, 0);
+        playerCollider = GetComponent<CapsuleCollider>();
+        originalColliderSize = playerCollider.height * Vector3.up;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        PlayerMove();
+        // Move forward constantly
+        transform.Translate(Vector3.forward * speed * Time.deltaTime);
+
+        // Handle lane switching
+        if (Input.GetKeyDown(KeyCode.LeftArrow) && currentLane > -1)
+        {
+            currentLane--;
+            MovePlayer();
+        }
+        else if (Input.GetKeyDown(KeyCode.RightArrow) && currentLane < 1)
+        {
+            currentLane++;
+            MovePlayer();
+        }
+
+        // Handle jump
+        if (Input.GetKeyDown(KeyCode.UpArrow) && !isJumping && !isSliding)
+        {
+            StartCoroutine(Jump());
+        }
+
+        // Handle slide
+        if (Input.GetKeyDown(KeyCode.DownArrow) && !isSliding && !isJumping)
+        {
+            StartCoroutine(Slide());
+        }
+        
+        // Update the score based on the player's forward movement
+        score += transform.position.z * scoreMultiplier * Time.deltaTime;
+        scoreText.text = /Mathf.FloorToInt(score).ToString();
+
     }
 
-
-    public void PlayerMove()
+    void MovePlayer()
     {
-        float horizontalInput = Input.GetAxis("Horizontal");
+        Vector3 targetPosition = new Vector3(currentLane * laneWidth, transform.position.y, transform.position.z);
+        transform.position = targetPosition;
+    }
 
-        transform.Translate(Vector3.forward * speed * Time.deltaTime);
-        Vector3 newPosition = transform.position + Vector3.right * horizontalInput * horizontalSpeed * Time.deltaTime;
-        newPosition.x = Mathf.Clamp(newPosition.x, -3.5f, 3.5f);
-        transform.position = newPosition;
+    IEnumerator Jump()
+    {
+        isJumping = true;
+        rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
 
-        // if (Input.GetKeyDown(KeyCode.A) && transform.position.x>-2)
-        // {
-        //     transform.position = new Vector3((transform.position.x-2), 1, transform.position.z);
-        // }
-        // if (Input.GetKeyDown(KeyCode.D) && transform.position.x<2)
-        // {
-        //     transform.position = new Vector3((transform.position.x+2), 1, transform.position.z);
-        // }
-        if (Input.GetKeyDown(KeyCode.W) && isGrounded)
-        {
-            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-            isGrounded = false;
-        }
+        // Wait for half of the jump duration to simulate the upward motion
+        yield return new WaitForSeconds(jumpDuration / 2);
+
+        // Apply downward force to make the landing quicker
+        rb.AddForce(Vector3.down * jumpForce * 2, ForceMode.Impulse);
+
+        // Wait for the second half of the jump duration to complete the landing
+        yield return new WaitForSeconds(jumpDuration / 2);
+
+        isJumping = false;
+    }
+
+    IEnumerator Slide()
+    {
+        isSliding = true;
+        playerCollider.height = originalColliderSize.y / 4;
+        yield return new WaitForSeconds(slideDuration);
+        playerCollider.height = originalColliderSize.y;
+        isSliding = false;
     }
 
     private void OnCollisionEnter(Collision other)
     {
-        if (other.gameObject.CompareTag("Ground"))
+        if (other.gameObject.CompareTag("Collectable"))
         {
-            isGrounded = true;
-        }
-        if (other.gameObject.CompareTag("Obstacle"))
-        {
-            // Trigger Game Over logic here
-            Debug.Log("Game Over!");
-            Time.timeScale = 0; // Pauses the game
+            Destroy(other.gameObject);
         }
     }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.gameObject.CompareTag("Collectable"))
+        {
+            Destroy(other.gameObject);
+            coins++;
+            coinText.text = $"Coins: {coins}";
+        }  
+        if (other.gameObject.CompareTag("Obstacle"))
+        {
+            Debug.Log("Triggered");
+            //Destroy(other.gameObject);
+        }
+        
+    }
+    
+    
 }
