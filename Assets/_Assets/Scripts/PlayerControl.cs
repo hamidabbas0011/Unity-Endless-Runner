@@ -23,14 +23,20 @@ public class PlayerControl : MonoBehaviour
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
     private Vector3 originalColliderSize;
-
+    public GameObject gameOverUI;
+    private Animator _animator;
+    public TMP_Text gameOverScore;
+    
     void Start()
     {
+        _animator = GetComponent<Animator>();
+        gameOverUI.SetActive(false);
         coinText.text = $"Coins: {coins}";
         scoreText.text = "0";
         rb = GetComponent<Rigidbody>();
         playerCollider = GetComponent<CapsuleCollider>();
         originalColliderSize = playerCollider.height * Vector3.up;
+        //_animator.SetBool("isRunning", true);
     }
 
     void Update()
@@ -51,20 +57,24 @@ public class PlayerControl : MonoBehaviour
         }
 
         // Handle jump
-        if (Input.GetKeyDown(KeyCode.UpArrow) && !isJumping && !isSliding)
+        if (Input.GetKeyDown(KeyCode.UpArrow) && !isJumping)
         {
             StartCoroutine(Jump());
+           _animator.SetBool("isJumping",true);    
+
         }
 
         // Handle slide
         if (Input.GetKeyDown(KeyCode.DownArrow) && !isSliding && !isJumping)
         {
+            _animator.SetBool("isSliding",true);
             StartCoroutine(Slide());
         }
         
         // Update the score based on the player's forward movement
         score += transform.position.z * scoreMultiplier * Time.deltaTime;
-        scoreText.text = /Mathf.FloorToInt(score).ToString();
+        int z = Convert.ToInt32(score);
+        scoreText.text = z.ToString();
 
     }
 
@@ -87,26 +97,22 @@ public class PlayerControl : MonoBehaviour
 
         // Wait for the second half of the jump duration to complete the landing
         yield return new WaitForSeconds(jumpDuration / 2);
-
+        _animator.SetBool("isJumping",false);
         isJumping = false;
     }
 
     IEnumerator Slide()
     {
         isSliding = true;
-        playerCollider.height = originalColliderSize.y / 4;
+        playerCollider.height = originalColliderSize.y / 2;
         yield return new WaitForSeconds(slideDuration);
         playerCollider.height = originalColliderSize.y;
         isSliding = false;
+        _animator.SetBool("isSliding",false);
+
     }
 
-    private void OnCollisionEnter(Collision other)
-    {
-        if (other.gameObject.CompareTag("Collectable"))
-        {
-            Destroy(other.gameObject);
-        }
-    }
+    
 
     private void OnTriggerEnter(Collider other)
     {
@@ -118,8 +124,12 @@ public class PlayerControl : MonoBehaviour
         }  
         if (other.gameObject.CompareTag("Obstacle"))
         {
+            int x = Convert.ToInt32(score); 
+            gameOverUI.SetActive(true);
             Debug.Log("Triggered");
-            //Destroy(other.gameObject);
+            gameOverScore.text = $"Final Score: {x}";
+            Time.timeScale = 0; //Freeze the game
+            
         }
         
     }
